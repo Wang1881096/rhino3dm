@@ -19,7 +19,7 @@ import shutil
 xcode_logging = False
 verbose = False
 overwrite = False
-valid_platform_args = ["js"]
+valid_platform_args = ["js", "ios"]
 platform_full_names = {'js': 'JavaScript', 'ios': 'iOS'}
 script_folder = os.path.abspath(os.path.dirname(os.path.realpath(__file__)))
 build_folder = os.path.abspath(os.path.join(script_folder, "..", "build"))
@@ -65,6 +65,29 @@ def print_ok_message(ok_message):
               bcolors.ENDC)
 
 
+def run_command_show_output(command):
+    if verbose:
+        process = subprocess.Popen(shlex.split(command), stdout=subprocess.PIPE)
+    else:
+        dev_null = open(os.devnull, 'w')  # sending to dev/null here because sending everything to pipe causes hang
+        process = subprocess.Popen(shlex.split(command), stdout=subprocess.PIPE, stderr=dev_null)
+    while True:
+        output = process.stdout.readline()
+        if not output:
+            break
+        if len(output) == 0 and process.poll() is not None:
+            break
+        if output:
+            if sys.version_info[0] < 3:
+                print(output.strip())
+            else:
+                output = output.decode('utf-8').strip()
+                print(output)
+
+    rc = process.poll()
+    return rc
+
+
 # ---------------------------------------------- Platform Setup --------------------------------------------------------
 def print_platform_preamble(platform_target_name):
     print("")
@@ -72,6 +95,36 @@ def print_platform_preamble(platform_target_name):
         print("Setting up " + platform_target_name + "...")
     else:
         print(bcolors.BOLD + "Setting up " + platform_target_name + "..." + bcolors.ENDC)
+
+
+def setup_ios():
+    platform_target_path = os.path.join(build_folder, platform_full_names.get("ios").lower())
+
+    target_file_name = "rhino3dm.xcodeproj"
+
+    item_to_check = os.path.abspath(os.path.join(platform_target_path, target_file_name))
+    if os.path.exists(item_to_check):
+        if not overwrite:
+            print_warning_message("A configuration already appears in " + item_to_check + ". Use --overwrite to replace.")
+            return False
+        if overwrite:
+            shutil.rmtree(platform_target_path)
+
+    if not os.path.exists(platform_target_path):
+        os.mkdir(platform_target_path)
+
+    os.chdir(platform_target_path)
+
+    command = "cmake -G \"Xcode\" -DCMAKE_TOOLCHAIN_FILE=../../src/ios.toolchain.cmake -DPLATFORM=OS64COMBINED -DDEPLOYMENT_TARGET=9.3 ../../src"
+    run_command_show_output(command)
+
+    # Check to see if the CMakeFiles were written...
+    if os.path.exists(item_to_check):
+        print_ok_message("successfully wrote: " + item_to_check)
+    else:
+        print_error_message("failed to configure and generate " + target_file_name + " for iOS build")
+
+    os.chdir(script_folder)
 
 
 def setup_js():
@@ -116,7 +169,7 @@ def setup_js():
 
     # Check to see if the CMakeFiles were written...
     if os.path.exists(item_to_check):
-        print_ok_message("build files have been written to: " + platform_target_path)
+        print_ok_message("make files have been written to: " + platform_target_path)
     else:
         print_error_message("failed to configure and generate CMakeFiles for JavaScript build")
 
@@ -173,6 +226,8 @@ def main():
 
     global overwrite
     overwrite = args.overwrite
+
+    os.chdir(script_folder)
 
     # setup platform(s)
     if args.platform is not None:

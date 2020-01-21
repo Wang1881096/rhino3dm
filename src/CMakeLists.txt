@@ -11,6 +11,10 @@ if (PYTHON_EXECUTABLE)
   add_subdirectory(lib/pybind11)
 endif()
 
+if(IOS)
+  message("iOS Compile")
+endif()
+
 file(GLOB bindings_SRC "bindings/*.h" "bindings/*.cpp")
 file(GLOB zlib_SRC "lib/opennurbs/zlib/*.h" "lib/opennurbs/zlib/*.c")
 
@@ -75,6 +79,21 @@ if (PYTHON_EXECUTABLE)
     target_link_libraries(_rhino3dm PRIVATE zlib_static)
     target_link_libraries(_rhino3dm PRIVATE opennurbs_static)
   endif()
+endif()
+
+if(IOS)
+  add_library(rhino3dm STATIC ${zlib_SRC} ${opennurbs_SRC})
+  add_library(zlib_static STATIC ${zlib_SRC})
+  add_library(opennurbs_static STATIC ${opennurbs_SRC})
+  target_link_libraries(rhino3dm PRIVATE zlib_static)
+  target_link_libraries(rhino3dm PRIVATE opennurbs_static)
+  # set_xcode_property (TARGET XCODE_PROPERTY XCODE_VALUE XCODE_VARIANT)
+  #   A convenience macro for setting xcode specific properties on targets.
+  #   Available variants are: All, Release, RelWithDebInfo, Debug, MinSizeRel
+  #   example: set_xcode_property (myioslib IPHONEOS_DEPLOYMENT_TARGET "3.1" "all").
+  set_xcode_property(rhino3dm CODE_SIGN_STYLE "Manual" "All")
+  set_xcode_property(rhino3dm CODE_SIGN_IDENTITY "Developer ID Application" "All")
+  
 endif()
 
 # I plan to mode the following install phase out of this file and into the top
